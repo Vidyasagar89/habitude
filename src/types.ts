@@ -7,4 +7,6 @@ export interface Habit {
   startDate: string
   /** Longest streak ever recorded for this habit, in whole days. */
   bestStreakDays: number
+  /** Index into PALETTE (src/palette.ts) for this habit's card color. */
+  colorIndex: number
 }

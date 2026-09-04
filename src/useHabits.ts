@@ -12,7 +12,7 @@ export function useHabits() {
     saveHabits(habits)
   }, [habits])
 
-  function addHabit(name: string) {
+  function addHabit(name: string, colorIndex: number) {
     const trimmed = name.trim()
     if (!trimmed) return
 
@@ -23,6 +23,7 @@ export function useHabits() {
       createdAt: today,
       startDate: today,
       bestStreakDays: 0,
+      colorIndex,
     }
     setHabits((current) => [...current, habit])
   }
