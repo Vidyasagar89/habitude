@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
+import { exportHabits, parseHabitsBackup } from './backup'
 import { PALETTE, gradientFor } from './palette'
 import { Sheet } from './Sheet'
 import { daysSince, formatShortDate } from './dateUtils'
@@ -17,11 +18,14 @@ const SORT_CYCLE: SortMode[] = ['streak', 'name', 'newest']
 const TOAST_DURATION_MS = 4000
 
 function App() {
-  const { habits, addHabit, deleteHabit, resetHabit, initialToasts } = useHabits()
+  const { habits, addHabit, deleteHabit, resetHabit, replaceHabits, initialToasts } = useHabits()
   const [isAdding, setIsAdding] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [actionsFor, setActionsFor] = useState<Habit | null>(null)
+  const [pendingImport, setPendingImport] = useState<Habit[] | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('streak')
   const [toasts, setToasts] = useState(initialToasts)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const sortedHabits = useMemo(() => sortHabits(habits, sortMode), [habits, sortMode])
 
@@ -32,6 +36,33 @@ function App() {
 
   function dismissToast(id: string) {
     setToasts((current) => current.filter((t) => t.id !== id))
+  }
+
+  function pushToast(text: string) {
+    const id = crypto.randomUUID()
+    setToasts((current) => [...current, { id, text }])
+    setTimeout(() => dismissToast(id), TOAST_DURATION_MS)
+  }
+
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // so picking the same file again still fires onChange
+    if (!file) return
+
+    const parsed = parseHabitsBackup(await file.text())
+    if (!parsed) {
+      pushToast("That doesn't look like a Habitude backup file.")
+      return
+    }
+    setPendingImport(parsed)
+  }
+
+  function confirmImport() {
+    if (!pendingImport) return
+    replaceHabits(pendingImport)
+    pushToast(`Imported ${pendingImport.length} habit${pendingImport.length === 1 ? '' : 's'}.`)
+    setPendingImport(null)
+    setIsSettingsOpen(false)
   }
 
   // Auto-dismiss the milestone toasts computed at startup. Only depends on
@@ -46,21 +77,31 @@ function App() {
       <header className="topbar">
         <button
           className="icon-btn"
-          aria-label={`Sort: ${SORT_LABELS[sortMode]}. Tap to change.`}
+          aria-label="Settings"
           type="button"
-          onClick={cycleSort}
+          onClick={() => setIsSettingsOpen(true)}
         >
-          <SortIcon />
+          <GearIcon />
         </button>
         <h1>Habitude</h1>
-        <button
-          className="icon-btn"
-          aria-label="Add habit"
-          type="button"
-          onClick={() => setIsAdding(true)}
-        >
-          <PlusIcon />
-        </button>
+        <div className="topbar-actions">
+          <button
+            className="icon-btn"
+            aria-label={`Sort: ${SORT_LABELS[sortMode]}. Tap to change.`}
+            type="button"
+            onClick={cycleSort}
+          >
+            <SortIcon />
+          </button>
+          <button
+            className="icon-btn"
+            aria-label="Add habit"
+            type="button"
+            onClick={() => setIsAdding(true)}
+          >
+            <PlusIcon />
+          </button>
+        </div>
       </header>
 
       {habits.length > 1 && <p className="sort-label">{SORT_LABELS[sortMode]}</p>}
@@ -111,6 +152,66 @@ function App() {
             }}
             onCancel={() => setActionsFor(null)}
           />
+        )}
+      </Sheet>
+
+      <Sheet open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)}>
+        <div className="actions-sheet">
+          <p className="sheet-title">Backup</p>
+          <button
+            type="button"
+            className="sheet-option"
+            onClick={() => {
+              exportHabits(habits)
+              setIsSettingsOpen(false)
+            }}
+            disabled={habits.length === 0}
+          >
+            Export data
+          </button>
+          <button
+            type="button"
+            className="sheet-option"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Import data
+          </button>
+          <button
+            type="button"
+            className="sheet-option sheet-option-muted"
+            onClick={() => setIsSettingsOpen(false)}
+          >
+            Close
+          </button>
+        </div>
+      </Sheet>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json"
+        onChange={handleFileSelected}
+        style={{ display: 'none' }}
+      />
+
+      <Sheet open={pendingImport !== null} onClose={() => setPendingImport(null)}>
+        {pendingImport && (
+          <div className="actions-sheet">
+            <p className="sheet-title">
+              Replace your {habits.length} habit{habits.length === 1 ? '' : 's'} with{' '}
+              {pendingImport.length} from this file?
+            </p>
+            <button type="button" className="sheet-option sheet-option-danger" onClick={confirmImport}>
+              Yes, import
+            </button>
+            <button
+              type="button"
+              className="sheet-option sheet-option-muted"
+              onClick={() => setPendingImport(null)}
+            >
+              Cancel
+            </button>
+          </div>
         )}
       </Sheet>
 
@@ -298,6 +399,20 @@ function PlusIcon() {
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+function GearIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
       />
     </svg>
   )
