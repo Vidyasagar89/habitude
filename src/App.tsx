@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { PALETTE, gradientFor } from './palette'
 import { Sheet } from './Sheet'
 import { daysSince, formatShortDate } from './dateUtils'
+import { ToastStack } from './Toast'
 import type { Habit } from './types'
 import { useHabits } from './useHabits'
 
@@ -13,12 +14,14 @@ const SORT_LABELS: Record<SortMode, string> = {
   newest: 'Newest first',
 }
 const SORT_CYCLE: SortMode[] = ['streak', 'name', 'newest']
+const TOAST_DURATION_MS = 4000
 
 function App() {
-  const { habits, addHabit, deleteHabit, resetHabit } = useHabits()
+  const { habits, addHabit, deleteHabit, resetHabit, initialToasts } = useHabits()
   const [isAdding, setIsAdding] = useState(false)
   const [actionsFor, setActionsFor] = useState<Habit | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('streak')
+  const [toasts, setToasts] = useState(initialToasts)
 
   const sortedHabits = useMemo(() => sortHabits(habits, sortMode), [habits, sortMode])
 
@@ -26,6 +29,17 @@ function App() {
     const next = SORT_CYCLE[(SORT_CYCLE.indexOf(sortMode) + 1) % SORT_CYCLE.length]
     setSortMode(next)
   }
+
+  function dismissToast(id: string) {
+    setToasts((current) => current.filter((t) => t.id !== id))
+  }
+
+  // Auto-dismiss the milestone toasts computed at startup. Only depends on
+  // `initialToasts`, which useHabits computes once and never changes.
+  useEffect(() => {
+    const timers = initialToasts.map((t) => setTimeout(() => dismissToast(t.id), TOAST_DURATION_MS))
+    return () => timers.forEach(clearTimeout)
+  }, [initialToasts])
 
   return (
     <div className="app">
@@ -91,16 +105,16 @@ function App() {
               resetHabit(actionsFor.id)
               setActionsFor(null)
             }}
-            onDelete={() => {
-              if (confirm(`Delete "${actionsFor.name}"? This can't be undone.`)) {
-                deleteHabit(actionsFor.id)
-                setActionsFor(null)
-              }
+            onConfirmDelete={() => {
+              deleteHabit(actionsFor.id)
+              setActionsFor(null)
             }}
             onCancel={() => setActionsFor(null)}
           />
         )}
       </Sheet>
+
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }
@@ -162,21 +176,45 @@ function HabitCard({
 function HabitActions({
   habit,
   onReset,
-  onDelete,
+  onConfirmDelete,
   onCancel,
 }: {
   habit: Habit
   onReset: () => void
-  onDelete: () => void
+  onConfirmDelete: () => void
   onCancel: () => void
 }) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  if (confirmingDelete) {
+    return (
+      <div className="actions-sheet">
+        <p className="sheet-title">Delete "{habit.name}"? This can't be undone.</p>
+        <button type="button" className="sheet-option sheet-option-danger" onClick={onConfirmDelete}>
+          Yes, delete it
+        </button>
+        <button
+          type="button"
+          className="sheet-option sheet-option-muted"
+          onClick={() => setConfirmingDelete(false)}
+        >
+          Cancel
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="actions-sheet">
       <p className="sheet-title">{habit.name}</p>
       <button type="button" className="sheet-option" onClick={onReset}>
         Reset streak
       </button>
-      <button type="button" className="sheet-option sheet-option-danger" onClick={onDelete}>
+      <button
+        type="button"
+        className="sheet-option sheet-option-danger"
+        onClick={() => setConfirmingDelete(true)}
+      >
         Delete habit
       </button>
       <button type="button" className="sheet-option sheet-option-muted" onClick={onCancel}>

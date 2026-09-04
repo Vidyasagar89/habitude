@@ -9,4 +9,6 @@ export interface Habit {
   bestStreakDays: number
   /** Index into PALETTE (src/palette.ts) for this habit's card color. */
   colorIndex: number
+  /** Highest milestone (src/milestones.ts) already celebrated for the current streak. */
+  lastCelebratedMilestone?: number
 }

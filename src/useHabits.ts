@@ -1,10 +1,34 @@
 import { useEffect, useState } from 'react'
 import { daysSince, todayISODate } from './dateUtils'
+import { highestMilestoneReached } from './milestones'
 import { loadHabits, saveHabits } from './storage'
+import type { ToastMessage } from './Toast'
 import type { Habit } from './types'
 
+/**
+ * Loads habits from storage and, in the same pass, marks any streak
+ * milestone that was crossed while the app was closed as celebrated —
+ * returning the toasts to show for those. Computed once, at init, since a
+ * habit's day count can't change again until tomorrow.
+ */
+function loadInitialState(): { habits: Habit[]; initialToasts: ToastMessage[] } {
+  const initialToasts: ToastMessage[] = []
+  const habits = loadHabits().map((h) => {
+    const milestone = highestMilestoneReached(daysSince(h.startDate))
+    if (!milestone || milestone <= (h.lastCelebratedMilestone ?? 0)) return h
+
+    initialToasts.push({
+      id: crypto.randomUUID(),
+      text: `🎉 ${milestone}-day streak on "${h.name}"!`,
+    })
+    return { ...h, lastCelebratedMilestone: milestone }
+  })
+  return { habits, initialToasts }
+}
+
 export function useHabits() {
-  const [habits, setHabits] = useState<Habit[]>(() => loadHabits())
+  const [{ habits: initialHabits, initialToasts }] = useState(loadInitialState)
+  const [habits, setHabits] = useState<Habit[]>(initialHabits)
 
   // Persist on every change. Skipping the very first render would save one
   // write, but it's cheap and this keeps the effect simple.
@@ -42,10 +66,11 @@ export function useHabits() {
           ...h,
           startDate: todayISODate(),
           bestStreakDays: Math.max(h.bestStreakDays, finishedStreak),
+          lastCelebratedMilestone: undefined,
         }
       }),
     )
   }
 
-  return { habits, addHabit, deleteHabit, resetHabit }
+  return { habits, addHabit, deleteHabit, resetHabit, initialToasts }
 }
