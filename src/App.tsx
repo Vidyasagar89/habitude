@@ -448,6 +448,12 @@ function HabitForm({
   const [name, setName] = useState(initial?.name ?? '')
   const [colorIndex, setColorIndex] = useState(initial?.colorIndex ?? 0)
   const [startDate, setStartDate] = useState(initial?.startDate ?? todayISODate())
+  // iOS Safari can hang if a <input type="date"> picker is reopened on the
+  // same DOM node it was previously closed on (a known WebKit bug, worse in
+  // standalone/home-screen PWAs). Bumping this on every blur forces React to
+  // throw the node away and mount a fresh one, so each tap always opens the
+  // picker on a node that's never been used before.
+  const [dateFieldKey, setDateFieldKey] = useState(0)
   const [personId, setPersonId] = useState(initial?.personId ?? ME_PERSON_ID)
   const [isAddingPerson, setIsAddingPerson] = useState(false)
   const [newPersonName, setNewPersonName] = useState('')
@@ -482,12 +488,14 @@ function HabitForm({
           Start date
         </label>
         <input
+          key={dateFieldKey}
           id="habit-start-date"
           className="add-input"
           type="date"
-          value={startDate}
+          defaultValue={startDate}
           max={todayISODate()}
           onChange={(e) => setStartDate(e.target.value)}
+          onBlur={() => setDateFieldKey((k) => k + 1)}
         />
       </div>
       <div className="field">
