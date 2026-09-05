@@ -52,6 +52,15 @@ export function useHabits() {
     setHabits((current) => [...current, habit])
   }
 
+  /** Renames a habit and/or changes its card color. */
+  function updateHabit(id: string, changes: { name: string; colorIndex: number }) {
+    const trimmed = changes.name.trim()
+    if (!trimmed) return
+    setHabits((current) =>
+      current.map((h) => (h.id === id ? { ...h, name: trimmed, colorIndex: changes.colorIndex } : h)),
+    )
+  }
+
   function deleteHabit(id: string) {
     setHabits((current) => current.filter((h) => h.id !== id))
   }
@@ -77,5 +86,5 @@ export function useHabits() {
     setHabits(newHabits)
   }
 
-  return { habits, addHabit, deleteHabit, resetHabit, replaceHabits, initialToasts }
+  return { habits, addHabit, updateHabit, deleteHabit, resetHabit, replaceHabits, initialToasts }
 }
