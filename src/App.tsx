@@ -17,9 +17,12 @@ const SORT_LABELS: Record<SortMode, string> = {
 const SORT_CYCLE: SortMode[] = ['streak', 'name', 'newest']
 const TOAST_DURATION_MS = 4000
 
+type FormState = { mode: 'add' } | { mode: 'edit'; habit: Habit }
+
 function App() {
-  const { habits, addHabit, deleteHabit, resetHabit, replaceHabits, initialToasts } = useHabits()
-  const [isAdding, setIsAdding] = useState(false)
+  const { habits, addHabit, updateHabit, deleteHabit, resetHabit, replaceHabits, initialToasts } =
+    useHabits()
+  const [formState, setFormState] = useState<FormState | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [actionsFor, setActionsFor] = useState<Habit | null>(null)
   const [pendingImport, setPendingImport] = useState<Habit[] | null>(null)
@@ -97,7 +100,7 @@ function App() {
             className="icon-btn"
             aria-label="Add habit"
             type="button"
-            onClick={() => setIsAdding(true)}
+            onClick={() => setFormState({ mode: 'add' })}
           >
             <PlusIcon />
           </button>
@@ -128,20 +131,32 @@ function App() {
         )}
       </main>
 
-      <Sheet open={isAdding} onClose={() => setIsAdding(false)}>
-        <AddHabitForm
-          onAdd={(name, colorIndex) => {
-            addHabit(name, colorIndex)
-            setIsAdding(false)
-          }}
-          onCancel={() => setIsAdding(false)}
-        />
+      <Sheet open={formState !== null} onClose={() => setFormState(null)}>
+        {formState && (
+          <HabitForm
+            initial={formState.mode === 'edit' ? formState.habit : undefined}
+            submitLabel={formState.mode === 'edit' ? 'Save changes' : 'Add habit'}
+            onSubmit={(name, colorIndex) => {
+              if (formState.mode === 'edit') {
+                updateHabit(formState.habit.id, { name, colorIndex })
+              } else {
+                addHabit(name, colorIndex)
+              }
+              setFormState(null)
+            }}
+            onCancel={() => setFormState(null)}
+          />
+        )}
       </Sheet>
 
       <Sheet open={actionsFor !== null} onClose={() => setActionsFor(null)}>
         {actionsFor && (
           <HabitActions
             habit={actionsFor}
+            onEdit={() => {
+              setFormState({ mode: 'edit', habit: actionsFor })
+              setActionsFor(null)
+            }}
             onReset={() => {
               resetHabit(actionsFor.id)
               setActionsFor(null)
@@ -276,11 +291,13 @@ function HabitCard({
 
 function HabitActions({
   habit,
+  onEdit,
   onReset,
   onConfirmDelete,
   onCancel,
 }: {
   habit: Habit
+  onEdit: () => void
   onReset: () => void
   onConfirmDelete: () => void
   onCancel: () => void
@@ -308,6 +325,9 @@ function HabitActions({
   return (
     <div className="actions-sheet">
       <p className="sheet-title">{habit.name}</p>
+      <button type="button" className="sheet-option" onClick={onEdit}>
+        Edit habit
+      </button>
       <button type="button" className="sheet-option" onClick={onReset}>
         Reset streak
       </button>
@@ -325,25 +345,29 @@ function HabitActions({
   )
 }
 
-function AddHabitForm({
-  onAdd,
+function HabitForm({
+  initial,
+  submitLabel,
+  onSubmit,
   onCancel,
 }: {
-  onAdd: (name: string, colorIndex: number) => void
+  initial?: { name: string; colorIndex: number }
+  submitLabel: string
+  onSubmit: (name: string, colorIndex: number) => void
   onCancel: () => void
 }) {
-  const [name, setName] = useState('')
-  const [colorIndex, setColorIndex] = useState(0)
+  const [name, setName] = useState(initial?.name ?? '')
+  const [colorIndex, setColorIndex] = useState(initial?.colorIndex ?? 0)
 
   return (
     <form
       className="add-form"
       onSubmit={(e) => {
         e.preventDefault()
-        onAdd(name, colorIndex)
+        onSubmit(name, colorIndex)
       }}
     >
-      <p className="sheet-title">New habit</p>
+      <p className="sheet-title">{initial ? 'Edit habit' : 'New habit'}</p>
       <input
         className="add-input"
         type="text"
@@ -370,7 +394,7 @@ function AddHabitForm({
           Cancel
         </button>
         <button type="submit" className="text-btn" disabled={!name.trim()}>
-          Add habit
+          {submitLabel}
         </button>
       </div>
     </form>
