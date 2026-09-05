@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
-import { exportHabits, parseHabitsBackup } from './backup'
+import { exportBackup, parseBackup, type HabitsBackup } from './backup'
 import { PALETTE, gradientFor } from './palette'
+import { ME_PERSON_ID, usePeople } from './people'
 import { Sheet } from './Sheet'
 import { daysSince, formatShortDate, todayISODate } from './dateUtils'
 import { ToastStack } from './Toast'
-import type { Habit } from './types'
+import type { Habit, Person } from './types'
 import { useHabits } from './useHabits'
 
 type SortMode = 'streak' | 'name' | 'newest'
@@ -22,15 +23,20 @@ type FormState = { mode: 'add' } | { mode: 'edit'; habit: Habit }
 function App() {
   const { habits, addHabit, editHabit, deleteHabit, resetHabit, replaceHabits, initialToasts } =
     useHabits()
+  const { people, addPerson, replacePeople } = usePeople()
   const [formState, setFormState] = useState<FormState | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [actionsFor, setActionsFor] = useState<Habit | null>(null)
-  const [pendingImport, setPendingImport] = useState<Habit[] | null>(null)
+  const [pendingImport, setPendingImport] = useState<HabitsBackup | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('streak')
+  const [personFilter, setPersonFilter] = useState<string | null>(null)
   const [toasts, setToasts] = useState(initialToasts)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const sortedHabits = useMemo(() => sortHabits(habits, sortMode), [habits, sortMode])
+  const visibleHabits = personFilter
+    ? sortedHabits.filter((h) => h.personId === personFilter)
+    : sortedHabits
 
   function cycleSort() {
     const next = SORT_CYCLE[(SORT_CYCLE.indexOf(sortMode) + 1) % SORT_CYCLE.length]
@@ -52,7 +58,7 @@ function App() {
     e.target.value = '' // so picking the same file again still fires onChange
     if (!file) return
 
-    const parsed = parseHabitsBackup(await file.text())
+    const parsed = parseBackup(await file.text())
     if (!parsed) {
       pushToast("That doesn't look like a Habitude backup file.")
       return
@@ -62,8 +68,12 @@ function App() {
 
   function confirmImport() {
     if (!pendingImport) return
-    replaceHabits(pendingImport)
-    pushToast(`Imported ${pendingImport.length} habit${pendingImport.length === 1 ? '' : 's'}.`)
+    replaceHabits(pendingImport.habits)
+    // Older backups (from before people existed) carry no people at all —
+    // leave the current device's people list alone rather than wipe it.
+    if (pendingImport.people.length > 0) replacePeople(pendingImport.people)
+    const count = pendingImport.habits.length
+    pushToast(`Imported ${count} habit${count === 1 ? '' : 's'}.`)
     setPendingImport(null)
     setIsSettingsOpen(false)
   }
@@ -109,6 +119,24 @@ function App() {
 
       {habits.length > 1 && <p className="sort-label">{SORT_LABELS[sortMode]}</p>}
 
+      {people.length > 1 && (
+        <div className="person-filter-row">
+          <PersonChip
+            label="All"
+            selected={personFilter === null}
+            onClick={() => setPersonFilter(null)}
+          />
+          {people.map((person) => (
+            <PersonChip
+              key={person.id}
+              label={person.name}
+              selected={personFilter === person.id}
+              onClick={() => setPersonFilter(person.id)}
+            />
+          ))}
+        </div>
+      )}
+
       <main className="content">
         {habits.length === 0 ? (
           <div className="empty-state">
@@ -118,12 +146,21 @@ function App() {
             <h2>No habits yet</h2>
             <p>Start your first streak to see it here.</p>
           </div>
+        ) : visibleHabits.length === 0 ? (
+          <div className="empty-state">
+            <span className="empty-emoji" aria-hidden="true">
+              🔥
+            </span>
+            <h2>No habits here</h2>
+            <p>{personName(people, personFilter)} doesn't have any habits yet.</p>
+          </div>
         ) : (
           <ul className="habit-grid">
-            {sortedHabits.map((habit) => (
+            {visibleHabits.map((habit) => (
               <HabitCard
                 key={habit.id}
                 habit={habit}
+                ownerName={people.length > 1 ? personName(people, habit.personId) : null}
                 onOpenActions={() => setActionsFor(habit)}
               />
             ))}
@@ -136,11 +173,13 @@ function App() {
           <HabitForm
             initial={formState.mode === 'edit' ? formState.habit : undefined}
             submitLabel={formState.mode === 'edit' ? 'Save changes' : 'Add habit'}
-            onSubmit={(name, colorIndex, startDate) => {
+            people={people}
+            onAddPerson={addPerson}
+            onSubmit={(name, colorIndex, startDate, personId) => {
               if (formState.mode === 'edit') {
-                editHabit(formState.habit.id, { name, colorIndex, startDate })
+                editHabit(formState.habit.id, { name, colorIndex, startDate, personId })
               } else {
-                addHabit(name, colorIndex, startDate)
+                addHabit(name, colorIndex, startDate, personId)
               }
               setFormState(null)
             }}
@@ -177,7 +216,7 @@ function App() {
             type="button"
             className="sheet-option"
             onClick={() => {
-              exportHabits(habits)
+              exportBackup(habits, people)
               setIsSettingsOpen(false)
             }}
             disabled={habits.length === 0}
@@ -214,7 +253,7 @@ function App() {
           <div className="actions-sheet">
             <p className="sheet-title">
               Replace your {habits.length} habit{habits.length === 1 ? '' : 's'} with{' '}
-              {pendingImport.length} from this file?
+              {pendingImport.habits.length} from this file?
             </p>
             <button type="button" className="sheet-option sheet-option-danger" onClick={confirmImport}>
               Yes, import
@@ -248,11 +287,37 @@ function sortHabits(habits: Habit[], mode: SortMode): Habit[] {
   }
 }
 
+function personName(people: Person[], personId: string | null): string {
+  return people.find((p) => p.id === personId)?.name ?? 'Someone'
+}
+
+function PersonChip({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={`person-chip${selected ? ' person-chip-selected' : ''}`}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  )
+}
+
 function HabitCard({
   habit,
+  ownerName,
   onOpenActions,
 }: {
   habit: Habit
+  ownerName: string | null
   onOpenActions: () => void
 }) {
   const days = daysSince(habit.startDate)
@@ -263,9 +328,10 @@ function HabitCard({
 
   return (
     <li
-      className="habit-card"
+      className={`habit-card${ownerName ? ' has-owner' : ''}`}
       style={{ background: gradientFor(habit.colorIndex) }}
     >
+      {ownerName && <span className="card-owner-badge">{ownerName}</span>}
       <button
         className="card-menu-btn"
         type="button"
@@ -348,24 +414,39 @@ function HabitActions({
 function HabitForm({
   initial,
   submitLabel,
+  people,
+  onAddPerson,
   onSubmit,
   onCancel,
 }: {
-  initial?: { name: string; colorIndex: number; startDate: string }
+  initial?: { name: string; colorIndex: number; startDate: string; personId: string }
   submitLabel: string
-  onSubmit: (name: string, colorIndex: number, startDate: string) => void
+  people: Person[]
+  onAddPerson: (name: string) => string
+  onSubmit: (name: string, colorIndex: number, startDate: string, personId: string) => void
   onCancel: () => void
 }) {
   const [name, setName] = useState(initial?.name ?? '')
   const [colorIndex, setColorIndex] = useState(initial?.colorIndex ?? 0)
   const [startDate, setStartDate] = useState(initial?.startDate ?? todayISODate())
+  const [personId, setPersonId] = useState(initial?.personId ?? ME_PERSON_ID)
+  const [isAddingPerson, setIsAddingPerson] = useState(false)
+  const [newPersonName, setNewPersonName] = useState('')
+
+  function confirmNewPerson() {
+    const trimmed = newPersonName.trim()
+    if (!trimmed) return
+    setPersonId(onAddPerson(trimmed))
+    setNewPersonName('')
+    setIsAddingPerson(false)
+  }
 
   return (
     <form
       className="add-form"
       onSubmit={(e) => {
         e.preventDefault()
-        onSubmit(name, colorIndex, startDate)
+        onSubmit(name, colorIndex, startDate, personId)
       }}
     >
       <p className="sheet-title">{initial ? 'Edit habit' : 'New habit'}</p>
@@ -389,6 +470,41 @@ function HabitForm({
           max={todayISODate()}
           onChange={(e) => setStartDate(e.target.value)}
         />
+      </div>
+      <div className="field">
+        <span className="field-label">For</span>
+        <div className="person-row">
+          {people.map((person) => (
+            <PersonChip
+              key={person.id}
+              label={person.name}
+              selected={personId === person.id}
+              onClick={() => setPersonId(person.id)}
+            />
+          ))}
+          <PersonChip label="+ Add" selected={false} onClick={() => setIsAddingPerson(true)} />
+        </div>
+        {isAddingPerson && (
+          <div className="person-add-row">
+            <input
+              className="add-input"
+              type="text"
+              placeholder="Family member's name"
+              value={newPersonName}
+              onChange={(e) => setNewPersonName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  confirmNewPerson()
+                }
+              }}
+              autoFocus
+            />
+            <button type="button" className="text-btn" disabled={!newPersonName.trim()} onClick={confirmNewPerson}>
+              Add
+            </button>
+          </div>
+        )}
       </div>
       <div className="swatch-row">
         {PALETTE.map((color, index) => (

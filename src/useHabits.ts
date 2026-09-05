@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { daysSince, todayISODate } from './dateUtils'
 import { highestMilestoneReached } from './milestones'
+import { ME_PERSON_ID } from './people'
 import { loadHabits, saveHabits } from './storage'
 import type { ToastMessage } from './Toast'
 import type { Habit } from './types'
@@ -37,7 +38,12 @@ export function useHabits() {
   }, [habits])
 
   /** startDate defaults to today; pass an earlier date for a habit you were already doing. */
-  function addHabit(name: string, colorIndex: number, startDate: string = todayISODate()) {
+  function addHabit(
+    name: string,
+    colorIndex: number,
+    startDate: string = todayISODate(),
+    personId: string = ME_PERSON_ID,
+  ) {
     const trimmed = name.trim()
     if (!trimmed) return
 
@@ -48,17 +54,21 @@ export function useHabits() {
       startDate,
       bestStreakDays: 0,
       colorIndex,
+      personId,
     }
     setHabits((current) => [...current, habit])
   }
 
   /**
-   * Renames a habit, changes its card color, and/or corrects its start
-   * date. If the habit has never been reset, createdAt moves with
+   * Renames a habit, changes its card color/owner, and/or corrects its
+   * start date. If the habit has never been reset, createdAt moves with
    * startDate too — they're the same fact ("when this streak began") until
    * a reset makes them different things.
    */
-  function editHabit(id: string, changes: { name: string; colorIndex: number; startDate: string }) {
+  function editHabit(
+    id: string,
+    changes: { name: string; colorIndex: number; startDate: string; personId: string },
+  ) {
     const trimmed = changes.name.trim()
     if (!trimmed) return
     setHabits((current) =>
@@ -69,6 +79,7 @@ export function useHabits() {
           ...h,
           name: trimmed,
           colorIndex: changes.colorIndex,
+          personId: changes.personId,
           startDate: changes.startDate,
           createdAt: neverReset ? changes.startDate : h.createdAt,
         }
