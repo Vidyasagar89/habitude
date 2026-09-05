@@ -3,7 +3,7 @@ import './App.css'
 import { exportHabits, parseHabitsBackup } from './backup'
 import { PALETTE, gradientFor } from './palette'
 import { Sheet } from './Sheet'
-import { daysSince, formatShortDate } from './dateUtils'
+import { daysSince, formatShortDate, todayISODate } from './dateUtils'
 import { ToastStack } from './Toast'
 import type { Habit } from './types'
 import { useHabits } from './useHabits'
@@ -20,7 +20,7 @@ const TOAST_DURATION_MS = 4000
 type FormState = { mode: 'add' } | { mode: 'edit'; habit: Habit }
 
 function App() {
-  const { habits, addHabit, updateHabit, deleteHabit, resetHabit, replaceHabits, initialToasts } =
+  const { habits, addHabit, editHabit, deleteHabit, resetHabit, replaceHabits, initialToasts } =
     useHabits()
   const [formState, setFormState] = useState<FormState | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -136,11 +136,11 @@ function App() {
           <HabitForm
             initial={formState.mode === 'edit' ? formState.habit : undefined}
             submitLabel={formState.mode === 'edit' ? 'Save changes' : 'Add habit'}
-            onSubmit={(name, colorIndex) => {
+            onSubmit={(name, colorIndex, startDate) => {
               if (formState.mode === 'edit') {
-                updateHabit(formState.habit.id, { name, colorIndex })
+                editHabit(formState.habit.id, { name, colorIndex, startDate })
               } else {
-                addHabit(name, colorIndex)
+                addHabit(name, colorIndex, startDate)
               }
               setFormState(null)
             }}
@@ -351,20 +351,21 @@ function HabitForm({
   onSubmit,
   onCancel,
 }: {
-  initial?: { name: string; colorIndex: number }
+  initial?: { name: string; colorIndex: number; startDate: string }
   submitLabel: string
-  onSubmit: (name: string, colorIndex: number) => void
+  onSubmit: (name: string, colorIndex: number, startDate: string) => void
   onCancel: () => void
 }) {
   const [name, setName] = useState(initial?.name ?? '')
   const [colorIndex, setColorIndex] = useState(initial?.colorIndex ?? 0)
+  const [startDate, setStartDate] = useState(initial?.startDate ?? todayISODate())
 
   return (
     <form
       className="add-form"
       onSubmit={(e) => {
         e.preventDefault()
-        onSubmit(name, colorIndex)
+        onSubmit(name, colorIndex, startDate)
       }}
     >
       <p className="sheet-title">{initial ? 'Edit habit' : 'New habit'}</p>
@@ -376,6 +377,19 @@ function HabitForm({
         onChange={(e) => setName(e.target.value)}
         autoFocus
       />
+      <div className="field">
+        <label className="field-label" htmlFor="habit-start-date">
+          Start date
+        </label>
+        <input
+          id="habit-start-date"
+          className="add-input"
+          type="date"
+          value={startDate}
+          max={todayISODate()}
+          onChange={(e) => setStartDate(e.target.value)}
+        />
+      </div>
       <div className="swatch-row">
         {PALETTE.map((color, index) => (
           <button

@@ -36,28 +36,43 @@ export function useHabits() {
     saveHabits(habits)
   }, [habits])
 
-  function addHabit(name: string, colorIndex: number) {
+  /** startDate defaults to today; pass an earlier date for a habit you were already doing. */
+  function addHabit(name: string, colorIndex: number, startDate: string = todayISODate()) {
     const trimmed = name.trim()
     if (!trimmed) return
 
-    const today = todayISODate()
     const habit: Habit = {
       id: crypto.randomUUID(),
       name: trimmed,
-      createdAt: today,
-      startDate: today,
+      createdAt: startDate,
+      startDate,
       bestStreakDays: 0,
       colorIndex,
     }
     setHabits((current) => [...current, habit])
   }
 
-  /** Renames a habit and/or changes its card color. */
-  function updateHabit(id: string, changes: { name: string; colorIndex: number }) {
+  /**
+   * Renames a habit, changes its card color, and/or corrects its start
+   * date. If the habit has never been reset, createdAt moves with
+   * startDate too — they're the same fact ("when this streak began") until
+   * a reset makes them different things.
+   */
+  function editHabit(id: string, changes: { name: string; colorIndex: number; startDate: string }) {
     const trimmed = changes.name.trim()
     if (!trimmed) return
     setHabits((current) =>
-      current.map((h) => (h.id === id ? { ...h, name: trimmed, colorIndex: changes.colorIndex } : h)),
+      current.map((h) => {
+        if (h.id !== id) return h
+        const neverReset = h.startDate === h.createdAt
+        return {
+          ...h,
+          name: trimmed,
+          colorIndex: changes.colorIndex,
+          startDate: changes.startDate,
+          createdAt: neverReset ? changes.startDate : h.createdAt,
+        }
+      }),
     )
   }
 
@@ -86,5 +101,5 @@ export function useHabits() {
     setHabits(newHabits)
   }
 
-  return { habits, addHabit, updateHabit, deleteHabit, resetHabit, replaceHabits, initialToasts }
+  return { habits, addHabit, editHabit, deleteHabit, resetHabit, replaceHabits, initialToasts }
 }
