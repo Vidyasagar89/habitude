@@ -3,7 +3,6 @@ import './App.css'
 import { exportBackup, parseBackup, type HabitsBackup } from './backup'
 import { PALETTE, gradientFor } from './palette'
 import { ME_PERSON_ID, usePeople } from './people'
-import { checkForUpdate } from './pwa'
 import { Sheet } from './Sheet'
 import { daysSince, formatShortDate, todayISODate } from './dateUtils'
 import { ToastStack } from './Toast'
@@ -77,20 +76,6 @@ function App() {
     pushToast(`Imported ${count} habit${count === 1 ? '' : 's'}.`)
     setPendingImport(null)
     setIsSettingsOpen(false)
-  }
-
-  async function handleCheckForUpdate() {
-    setIsSettingsOpen(false)
-    const supported = await checkForUpdate()
-    if (!supported) {
-      pushToast("Can't check for updates in this browser session — try reopening the app.")
-      return
-    }
-    pushToast('Checking for updates…')
-    // If a new version is found it's applied automatically and the page
-    // reloads on its own within a moment — this toast only shows if that
-    // doesn't happen, i.e. there was nothing to update.
-    setTimeout(() => pushToast("You're on the latest version."), 3000)
   }
 
   // Auto-dismiss the milestone toasts computed at startup. Only depends on
@@ -244,10 +229,6 @@ function App() {
             onClick={() => fileInputRef.current?.click()}
           >
             Import data
-          </button>
-          <p className="sheet-title">App</p>
-          <button type="button" className="sheet-option" onClick={handleCheckForUpdate}>
-            Check for updates
           </button>
           <button
             type="button"
