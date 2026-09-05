@@ -53,6 +53,11 @@
   letter-spacing: -0.3px;
 }
 
+.topbar-actions {
+  display: flex;
+  gap: 2px;
+}
+
 .icon-btn {
   display: flex;
   align-items: center;
@@ -294,6 +299,11 @@
   color: var(--text);
   cursor: pointer;
   text-align: center;
+}
+
+.sheet-option:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
 }
 
 .sheet-option-danger {

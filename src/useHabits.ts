@@ -72,5 +72,10 @@ export function useHabits() {
     )
   }
 
-  return { habits, addHabit, deleteHabit, resetHabit, initialToasts }
+  /** Wholesale replace all habits — used when importing a backup file. */
+  function replaceHabits(newHabits: Habit[]) {
+    setHabits(newHabits)
+  }
+
+  return { habits, addHabit, deleteHabit, resetHabit, replaceHabits, initialToasts }
 }
