@@ -1,8 +1,15 @@
-import type { Habit } from './types'
+import { ME_PERSON_ID } from './people'
+import type { Habit, Person } from './types'
 
-/** Triggers a browser download of the current habits as a JSON file. */
-export function exportHabits(habits: Habit[]): void {
-  const blob = new Blob([JSON.stringify(habits, null, 2)], { type: 'application/json' })
+export interface HabitsBackup {
+  habits: Habit[]
+  people: Person[]
+}
+
+/** Triggers a browser download of all habits and people as a JSON file. */
+export function exportBackup(habits: Habit[], people: Person[]): void {
+  const payload: HabitsBackup = { habits, people }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
@@ -14,8 +21,12 @@ export function exportHabits(habits: Habit[]): void {
 /**
  * Parses and shape-checks a backup file's contents. Returns null if it
  * doesn't look like a Habitude export, rather than importing junk data.
+ * Understands both the current `{ habits, people }` format and the older
+ * bare-array-of-habits format (from before people existed) — an old
+ * backup just won't bring any people along, which the caller can treat
+ * as "leave the current people list alone."
  */
-export function parseHabitsBackup(fileContents: string): Habit[] | null {
+export function parseBackup(fileContents: string): HabitsBackup | null {
   let parsed: unknown
   try {
     parsed = JSON.parse(fileContents)
@@ -23,15 +34,28 @@ export function parseHabitsBackup(fileContents: string): Habit[] | null {
     return null
   }
 
-  if (!Array.isArray(parsed)) return null
-  if (!parsed.every(isHabitShaped)) return null
-  // colorIndex didn't exist in every schema version — default it rather
-  // than reject the whole file over one missing field.
-  return parsed.map((h): Habit => ({ ...h, colorIndex: h.colorIndex ?? 0 }))
+  if (Array.isArray(parsed)) {
+    return parsed.every(isHabitShaped) ? { habits: normalizeHabits(parsed), people: [] } : null
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || !('habits' in parsed)) return null
+  const { habits, people } = parsed as { habits: unknown; people?: unknown }
+  if (!Array.isArray(habits) || !habits.every(isHabitShaped)) return null
+
+  return {
+    habits: normalizeHabits(habits),
+    people: Array.isArray(people) && people.every(isPersonShaped) ? people : [],
+  }
 }
 
-/** The fields a backup file must have; colorIndex is optional for older backups. */
-type RawHabit = Omit<Habit, 'colorIndex'> & { colorIndex?: number }
+function normalizeHabits(habits: RawHabit[]): Habit[] {
+  // colorIndex and personId didn't exist in every schema version — default
+  // them rather than reject the whole file over an older backup.
+  return habits.map((h) => ({ ...h, colorIndex: h.colorIndex ?? 0, personId: h.personId ?? ME_PERSON_ID }))
+}
+
+/** The fields a backup file must have; colorIndex/personId are optional for older backups. */
+type RawHabit = Omit<Habit, 'colorIndex' | 'personId'> & { colorIndex?: number; personId?: string }
 
 function isHabitShaped(value: unknown): value is RawHabit {
   if (typeof value !== 'object' || value === null) return false
@@ -43,4 +67,10 @@ function isHabitShaped(value: unknown): value is RawHabit {
     typeof h.startDate === 'string' &&
     typeof h.bestStreakDays === 'number'
   )
+}
+
+function isPersonShaped(value: unknown): value is Person {
+  if (typeof value !== 'object' || value === null) return false
+  const p = value as Record<string, unknown>
+  return typeof p.id === 'string' && typeof p.name === 'string'
 }

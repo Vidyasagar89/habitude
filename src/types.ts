@@ -11,4 +11,11 @@ export interface Habit {
   colorIndex: number
   /** Highest milestone (src/milestones.ts) already celebrated for the current streak. */
   lastCelebratedMilestone?: number
+  /** Id of the Person (src/people.ts) this habit is tracked for. */
+  personId: string
+}
+
+export interface Person {
+  id: string
+  name: string
 }

@@ -1,3 +1,4 @@
+import { ME_PERSON_ID } from './people'
 import type { Habit } from './types'
 
 const STORAGE_KEY = 'habitude.habits.v1'
@@ -14,8 +15,9 @@ export function loadHabits(): Habit[] {
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
     // Defend against data saved by an older version of the schema (e.g.
-    // colorIndex didn't exist before the gradient-card redesign).
-    return parsed.map((h) => ({ colorIndex: 0, ...h }))
+    // colorIndex didn't exist before the gradient-card redesign, personId
+    // didn't exist before per-person tracking).
+    return parsed.map((h) => ({ colorIndex: 0, personId: ME_PERSON_ID, ...h }))
   } catch {
     return []
   }
