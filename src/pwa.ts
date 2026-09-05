@@ -36,3 +36,18 @@ export async function checkForUpdate(): Promise<boolean> {
   await registration.update()
   return true
 }
+
+// Standalone/home-screen PWAs — especially on iOS — don't reliably re-check
+// for a new service worker just by being reopened: the app that was already
+// running (or the one iOS kept warm in the background) can keep serving a
+// stale build indefinitely unless something explicitly asks it to look
+// again. The Settings → "Check for updates" button covers that, but it
+// only helps if someone remembers to tap it. Checking automatically every
+// time the app comes back to the foreground catches the common case —
+// reopening the app after a new version has shipped — without relying on
+// that.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void checkForUpdate()
+  })
+}
