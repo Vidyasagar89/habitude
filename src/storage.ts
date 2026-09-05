@@ -12,7 +12,10 @@ export function loadHabits(): Habit[] {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
+    if (!Array.isArray(parsed)) return []
+    // Defend against data saved by an older version of the schema (e.g.
+    // colorIndex didn't exist before the gradient-card redesign).
+    return parsed.map((h) => ({ colorIndex: 0, ...h }))
   } catch {
     return []
   }

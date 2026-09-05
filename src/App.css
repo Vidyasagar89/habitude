@@ -67,28 +67,160 @@
   line-height: 1.4;
 }
 
-/* Add-habit form. Deliberately plain for now — real styling lands with the
-   gradient card redesign; this just proves the data layer works. */
-.add-form {
+.sort-label {
+  padding: 0 20px 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Gradient streak cards, two per row like the reference app. */
+.habit-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  align-content: start;
+}
+
+.habit-card {
+  position: relative;
+  aspect-ratio: 1 / 1.05;
+  border-radius: var(--radius-lg);
+  padding: 16px;
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #fff;
+  overflow: hidden;
+  box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.5);
+}
+
+.card-menu-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.15);
+  color: rgba(255, 255, 255, 0.85);
+  display: flex;
   align-items: center;
-  padding: 0 20px 16px;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.card-count {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.card-days {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.card-days-label {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.85;
+  margin-top: 4px;
+}
+
+.card-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.card-name {
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-date {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.card-best {
+  font-size: 11px;
+  opacity: 0.9;
+  margin-top: 2px;
+}
+
+/* Bottom sheets (add-habit form, per-habit action menu). */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+  z-index: 10;
+}
+
+.sheet {
+  width: 100%;
+  background: var(--surface-raised);
+  border-radius: 24px 24px 0 0;
+  padding: 20px 20px calc(var(--safe-bottom) + 20px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sheet-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-align: center;
 }
 
 .add-input {
-  flex: 1;
-  min-width: 0;
   background: var(--surface);
-  border: 1px solid var(--surface-raised);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   color: var(--text);
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .add-input:focus {
   outline: 1px solid var(--accent);
+}
+
+.swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+.swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.swatch-selected {
+  border-color: #fff;
+}
+
+.sheet-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
 }
 
 .text-btn {
@@ -97,7 +229,7 @@
   color: var(--accent);
   font-size: 15px;
   font-weight: 600;
-  padding: 8px;
+  padding: 10px 12px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -111,68 +243,29 @@
   color: var(--text-secondary);
 }
 
-.text-btn-danger {
+.actions-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sheet-option {
+  background: var(--surface);
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+}
+
+.sheet-option-danger {
   color: #ff5c5c;
 }
 
-/* Habit list — plain rows for now, replaced by gradient cards later. */
-.habit-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.habit-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--surface);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
-}
-
-.habit-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.habit-name {
-  font-size: 16px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.habit-date {
-  font-size: 13px;
+.sheet-option-muted {
   color: var(--text-secondary);
-  margin-top: 2px;
-}
-
-.habit-count {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1;
-}
-
-.habit-days {
-  font-size: 22px;
-  font-weight: 700;
-}
-
-.habit-days-label {
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.habit-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  background: none;
 }
