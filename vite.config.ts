@@ -10,6 +10,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // We register the service worker ourselves (src/pwa.ts) so a
+      // Settings → Check for updates tap can force a real update check,
+      // not just rely on the browser's own once-a-day background check.
+      injectRegister: false,
       includeAssets: ['favicon.svg', 'icons/apple-touch-icon.png'],
       manifest: {
         name: 'Habitude',
