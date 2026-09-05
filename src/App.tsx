@@ -450,10 +450,19 @@ function HabitForm({
   const [startDate, setStartDate] = useState(initial?.startDate ?? todayISODate())
   // iOS Safari can hang if a <input type="date"> picker is reopened on the
   // same DOM node it was previously closed on (a known WebKit bug, worse in
-  // standalone/home-screen PWAs). Bumping this on every blur forces React to
-  // throw the node away and mount a fresh one, so each tap always opens the
-  // picker on a node that's never been used before.
+  // standalone/home-screen PWAs). Bumping this forces React to throw the
+  // node away and mount a fresh one, so each tap always opens the picker on
+  // a node that's never been used before.
+  //
+  // The remount itself must NOT happen inside the blur handler, though.
+  // Closing the native picker already has WebKit mid-teardown on that exact
+  // node; yanking it out of the DOM in the same tick is what was actually
+  // hanging the app (on every date pick, not just on reopening — that was
+  // the bug this session was asked to fix). Deferring the bump to the next
+  // tick lets WebKit finish closing the picker first.
   const [dateFieldKey, setDateFieldKey] = useState(0)
+  const remountTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(remountTimer.current), [])
   const [personId, setPersonId] = useState(initial?.personId ?? ME_PERSON_ID)
   const [isAddingPerson, setIsAddingPerson] = useState(false)
   const [newPersonName, setNewPersonName] = useState('')
@@ -495,7 +504,10 @@ function HabitForm({
           defaultValue={startDate}
           max={todayISODate()}
           onChange={(e) => setStartDate(e.target.value)}
-          onBlur={() => setDateFieldKey((k) => k + 1)}
+          onBlur={() => {
+            clearTimeout(remountTimer.current)
+            remountTimer.current = setTimeout(() => setDateFieldKey((k) => k + 1), 0)
+          }}
         />
       </div>
       <div className="field">
