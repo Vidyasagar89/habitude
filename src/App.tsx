@@ -5,7 +5,15 @@ import { PALETTE, gradientFor } from './palette'
 import { ME_PERSON_ID, usePeople } from './people'
 import { checkForUpdate } from './pwa'
 import { Sheet } from './Sheet'
-import { daysSince, formatShortDate, todayISODate } from './dateUtils'
+import {
+  daysInMonth,
+  daysSince,
+  formatShortDate,
+  joinISODate,
+  monthName,
+  splitISODate,
+  todayISODate,
+} from './dateUtils'
 import { ToastStack } from './Toast'
 import type { Habit, Person } from './types'
 import { useHabits } from './useHabits'
@@ -452,6 +460,24 @@ function HabitForm({
   const [isAddingPerson, setIsAddingPerson] = useState(false)
   const [newPersonName, setNewPersonName] = useState('')
 
+  // Plain day/month/year <select>s instead of <input type="date">: the
+  // native picker overlay depends on browser chrome that a standalone
+  // home-screen PWA doesn't have, and hangs there on iOS — a WebKit bug in
+  // the native control itself, not fixable from here. Dropdowns never
+  // invoke that overlay at all.
+  const { year, month, day } = splitISODate(startDate)
+  const today = splitISODate(todayISODate())
+  const maxMonth = year === today.year ? today.month : 12
+  const maxDay = year === today.year && month === today.month ? today.day : daysInMonth(year, month)
+  const years = Array.from({ length: 101 }, (_, i) => today.year - i)
+  const months = Array.from({ length: maxMonth }, (_, i) => i + 1)
+  const days = Array.from({ length: maxDay }, (_, i) => i + 1)
+
+  function updateStartDate(changes: Partial<{ year: number; month: number; day: number }>) {
+    const next = { year, month, day, ...changes }
+    setStartDate(joinISODate(next.year, next.month, next.day))
+  }
+
   function confirmNewPerson() {
     const trimmed = newPersonName.trim()
     if (!trimmed) return
@@ -478,17 +504,45 @@ function HabitForm({
         autoFocus
       />
       <div className="field">
-        <label className="field-label" htmlFor="habit-start-date">
-          Start date
-        </label>
-        <input
-          id="habit-start-date"
-          className="add-input"
-          type="date"
-          value={startDate}
-          max={todayISODate()}
-          onChange={(e) => setStartDate(e.target.value)}
-        />
+        <span className="field-label">Start date</span>
+        <div className="date-select-row">
+          <select
+            className="add-input date-select"
+            aria-label="Day"
+            value={day}
+            onChange={(e) => updateStartDate({ day: Number(e.target.value) })}
+          >
+            {days.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+          <select
+            className="add-input date-select"
+            aria-label="Month"
+            value={month}
+            onChange={(e) => updateStartDate({ month: Number(e.target.value) })}
+          >
+            {months.map((m) => (
+              <option key={m} value={m}>
+                {monthName(m)}
+              </option>
+            ))}
+          </select>
+          <select
+            className="add-input date-select"
+            aria-label="Year"
+            value={year}
+            onChange={(e) => updateStartDate({ year: Number(e.target.value) })}
+          >
+            {years.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="field">
         <span className="field-label">For</span>
